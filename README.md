@@ -184,13 +184,10 @@ This ensures the sub-environments will correctly reference the packages at corre
 
 TODO: add support for benv my_env/my_sub_env
 
-# Share the effort!
+# Support My Work
 
 [Buy me a coffee!](https://ko-fi.com/s/5d943125ff)
 
-I’ve spent about 30 hours working on this script and cutting-out the complexity to reach a simpler form. It was a one-man effort so far. 
-And I value your time as well as mine. If you find it useful for you and you’d like to show your appreciation, consider sharing a coffee with me.
+I’ve put 30 hours into this script, refining and simplifying it. If you find it useful, consider buying me a coffee to show your appreciation.  
 
-Time counts as money for all of us!
-
-Thank you!
+Thanks for your support!
