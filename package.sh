@@ -1,0 +1,1 @@
+BASH_COMPLETIONS=benv.completions

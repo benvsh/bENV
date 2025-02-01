@@ -1,0 +1,335 @@
+#!/usr/bin/env bash
+# DEBUG
+[[ -n "$TRACE" ]] && {
+    set -x
+}
+# ERRORS
+set -e
+
+export DEFAULT_BASHER_ROOT="$HOME/.basher"
+
+# benv - a bash package manager that allows you to create virtual environments 
+# with dependencies. It is a wrapper around basher.
+#
+# Usage:
+#   benv <benv_id>|<package_url>
+#
+# Parameters:
+#   <benv_id>        Identifier for the virtual environment. For the id, use folder names under the benv root folder.
+#   <package_url>    URL to the package repository, same structure as basher's install <package_url>.
+benv() {
+    local package
+    local benv_id
+
+    # INIT
+    _ensure_basher
+
+    [[ -z $BENV_ROOT ]] && {
+        export BENV_ROOT="$DEFAULT_BASHER_ROOT/cellar/benvs"
+        _dbg "BENV_ROOT using default: $BENV_ROOT"
+    }
+    _info "BENV_ROOT using provided: $BENV_ROOT"
+
+    [[ -z $BENV0_ROOT ]] && {
+        export BENV0_ROOT="$BENV_ROOT/.benv0"
+    }
+    export BENV0_PACKAGES_PATH="$BENV0_ROOT/packages"
+    mkdir -p $BENV0_ROOT
+    mkdir -p $BENV0_PACKAGES_PATH
+
+    # PARSE ARGS
+    [ "$#" -ge 1 ] || { _help; exit 1; }
+    ## <benv_id>
+    [[ "$1" =~ ^[a-zA-Z_]+$ ]] && {
+        benv_id="$1"
+        shift
+        true
+    } || { _err "Invalid <benv_id>. Should be a string."; _help; exit 1; }
+
+    # ACTIVATE
+    _activate "$benv_id" $@
+}
+
+_activate() {
+    local benv_id="$1"
+    export BENV_PATH="$BENV_ROOT/$benv_id"
+    shift;
+
+    _dbg "BENV_ROOT: $BENV_ROOT"
+    _dbg "BENV_PATH: $BENV_PATH"
+
+    trap _cleanup EXIT INT TERM
+
+    (
+        # import outer
+        export -f _cleanup
+        export -f _lastfn_orfail
+        export -f _link
+        export -f _link_package
+        export -f _parse_package_url
+        export -f _ensure_active_benv
+        export -f _str_to_arr
+        export -f _help
+        export -f _err
+        export -f _info
+        export -f _dbg
+
+        export DEFAULT_BASHER_ROOT
+        export BENV_ROOT
+        export BENV_PATH
+        export BENV_ID="$benv_id"
+        export BENV_PACKAGES_PATH="$BENV_PATH/packages"
+
+        # make BASHER use benv path to store links, completions, etc.
+        export BASHER_PREFIX0="$BASHER_PREFIX"
+        export BASHER_PREFIX="$BENV_PATH"
+        # but install packages in shadowed packages folder BENV0
+        # to which we'll symlink under BENV_PATH
+        export BASHER_PACKAGES_PATH0="$BASHER_PACKAGES_PATH"
+        export BASHER_PACKAGES_PATH="$BENV_PACKAGES_PATH"
+        [[ -z "$BENV_PS1" ]] && {
+            export BENV_PS1='\[\e[32m\]\u@\h\[\e[33m\]/$BENV_ID:\[\e[0m\]\[\e[33m\]$(pwd | sed "s|$HOME|~|")\[\e[0m\]\$ '
+        }
+        export PS1="$BENV_PS1"
+
+        _basher0() {
+            _dbg "packages path: $BASHER_PACKAGES_PATH"
+            local basher_packages_path_old="$BASHER_PACKAGES_PATH"
+            export BASHER_PACKAGES_PATH="$BENV0_PACKAGES_PATH"
+            command basher "$@" || return 1
+            export BASHER_PACKAGES_PATH="$basher_packages_path_old"
+            return 0
+        }
+        export -f _basher0
+
+        basher() {
+            _dbg "benv: basher $@"
+            if [[ "$1" == "install" ]]; then
+                shift;
+
+                [[ -z "$*" ]] && {
+                    _err "No package URL provided."
+                    _help
+                    exit 1
+                }
+
+                ## <package_url1>:<package_url2>:...
+                IFS=: read -r -a package_urls <<< "$*"
+                # show package_urls as _dbg
+                _dbg "package_urls: ${package_urls[@]}"
+
+                # install each package_url
+                for package_url in "${package_urls[@]}"; do
+                    local as_arr=$(_str_to_arr "$package_url")
+                    local package="$(_parse_package_url ${as_arr[@]})"
+                    _lastfn_orfail
+                
+                    _dbg "basher0 install ${as_arr[@]}"
+                    _basher0 install ${as_arr[@]} || return 1
+
+                    _link "$package"
+                done
+            else
+                _basher0 "$@"
+            fi
+        }
+        export -f basher
+
+        ## reinit basher with new packages path
+        _dbg "Basher reinit packages path to $BASHER_PACKAGES_PATH"
+        eval "$($BASHER_ROOT/bin/basher init - bash)"
+
+        # update path 
+        # PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "$BASHER_ROOT" | tr '\n' ':' | sed 's/:$//')
+        export PATH="$BENV_PATH/bin:$PATH"
+
+        # runtime prepared, create benv folder
+        mkdir -p "$BENV_PATH"
+
+        # install package_url(s) 
+        [[ -n "$@" ]] && basher install $@
+
+        # activate venv
+        bash --noprofile --norc
+        true
+    ) || {
+        _err "Failed to activate benv: $benv_id"
+        exit 1
+    }
+}
+
+# NOTE: _link only works when inside an activated bENV
+_link() {
+    # sanity checks
+    _ensure_active_benv
+
+    local package="$1"
+    local package_path="$BENV0_PACKAGES_PATH/$package"
+
+    _link_package "$package"
+
+    if [ ! -e "$package_path/package.sh" ]; then
+        _dbg "$package_path/package.sh not found, skip deps crawl"
+        return
+    fi
+
+    shopt -s nullglob
+
+    source "$package_path/package.sh"
+    IFS=: read -ra deps <<< "$DEPS"
+
+    for dep in "${deps[@]}"
+    do
+        # recursively link
+        package=$(_parse_package_url "$dep")
+        _lastfn_orfail
+
+        _link "$package"
+    done
+}
+
+_link_package() {
+    _dbg "linking package_url: $1"
+
+    local package="$1"
+    local source_folder="$BENV0_PACKAGES_PATH/$package"
+    local benv_package_path="$BENV_PACKAGES_PATH/$package"
+    local target_folder="$benv_package_path"
+
+    _dbg "linking $source_folder to $target_folder"
+
+    [[ ! -d "$source_folder" ]] && {
+        _err "Package not found: $package"
+        exit 1
+    }
+
+    # rm package from venv to ensure we symlink it
+    mkdir -p "$target_folder"
+    rm -rf "$target_folder"
+    _dbg "for symlinking, target folder removed: $target_folder"
+    # so that symlinks don't create extra subfolder
+    ln -s "$source_folder" "$target_folder"
+
+    # ensure links are created into current bENV
+    # and dont recurse into deps, recurse handled by _link fn here
+    (
+        # search in root Basher context
+        export BASHER_PACKAGES_PATH="$BENV0_PACKAGES_PATH"
+        # but link into bENV
+        BASHER_INSTALL_BIN="$BENV_PATH/bin"
+        export BASHER_INSTALL_BIN
+        BASHER_INSTALL_MAN="$BENV_PATH/man"
+        export BASHER_INSTALL_MAN
+
+        cd $DEFAULT_BASHER_ROOT/libexec
+        ./basher-_link-bins "$package"
+        ./basher-_link-completions "$package"
+        ./basher-_link-man "$package"
+    )
+}
+
+_cleanup() {
+    _dbg "Cleaning up bENV"
+    
+    # remove folder if empty
+    if [ -z "$(ls -A "$BENV_PATH")" ]; then
+        rm -rf "$BENV_PATH"
+        _info "removed empty bENV: $BENV_PATH"
+    fi
+}
+
+_parse_package_url() {
+    local use_ssh="false"
+    local package=""
+    local site="github.com"
+
+    case $1 in
+    --ssh)
+        use_ssh="true"
+        shift
+    ;;
+    esac
+
+    if [ "$#" -ne 1 ]; then
+        _dbg "ARGS: $@"
+        _err "Invalid number of arguments. Expected a single package URL or identifier."
+        return 1
+    fi
+
+    if [[ "$1" = */*/* ]]; then
+        IFS=/ read -r site user name <<< "$1"
+        package="${user}/${name}"
+    else
+        package="$1"
+        site="github.com"
+    fi
+
+    if [ -z "$package" ]; then
+        _err "Cannot parse package URL: $@"
+        return 1
+    fi
+
+    echo "$package"
+    return 0
+}
+
+_help() {
+    echo "Usage:"
+    echo "  benv <benv_id>|<package_url>"
+    echo
+    echo "Parameters:"
+    echo "  <benv_id>        Identifier for the virtual environment. For the id, use folder names under the benv root folder."
+    echo "  <package_url>    URL to the package repository, same structure as basher's install <package_url>. A bENV alias is extracted aliased as '<user>-<package>'."
+}
+
+_ensure_basher() {
+    # basher present?
+    [[ -z "$BASHER_ROOT" ]] && {
+        _info "starting Basher ..."
+        eval "$(~/.basher/bin/basher init - bash)" || {
+            _err "Cannot start Basher"
+            exit 1
+        }
+    } || true
+}
+
+_ensure_active_benv() {
+    [[ -z "$BENV_PATH" ]] && {
+        _err "No active benv found. Please activate one."
+        exit 1
+    }
+}
+
+
+_lastfn_orfail() {
+    local fn_ret=$?
+    [[ $fn_ret -ne 0 ]] && {
+        _err "Last method failed. Return code: $fn_ret"
+        exit 1
+    }
+}
+
+# Usage example:
+#   package_url=$(_str_to_arr "$package_url")
+#   package=$(_parse_package_url "${package_url[@]}")
+_str_to_arr() {
+    local argStr="$1"
+    IFS=' ' read -r -a argArr <<< "$argStr"
+    echo "${argArr[@]}"
+}
+
+_dbg() {
+    [[ -z "$DBG" ]] && return
+    echo "[bENV:DEBUG] $1"
+}
+
+_info() {
+    [[ -z "$DBG" && -z "$INFO" ]] && return
+    echo "[bENV:INFO] $1"
+}
+
+_err() {
+    echo "[bENV:ERROR]: $1" >&2
+}
+
+[ "$0" == "$BASH_SOURCE" ] && benv "$@"

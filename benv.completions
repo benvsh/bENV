@@ -1,0 +1,14 @@
+_benv_completions() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [ "$prev" == "benv" ]; then
+        opts=$(find "$BENV_ROOT"/* -maxdepth 0 -type d -printf "%f\n")
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    fi
+}
+
+complete -F _benv_completions benv
