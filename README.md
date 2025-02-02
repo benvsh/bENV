@@ -145,15 +145,15 @@ This will create:
 │   │               └── bats <symlink2>
 │   │           └── LuRsT
 │   │               └── hr <symlink2>
-│   │   └── .benv0
-│   |       ├── packages <symlink2_target>
-│   |       │   ├── myuser
-│   |       │   │   └── some_package 
-│   |       │   │   └── other_package
-│   |       │   └── sstephenson
-│   |       │       └── bats 
-│   |       │   └── LuRsT
-│   |       │       └── hr
+│   │       └── .benv0
+│   |           ├── packages <symlink2_target>
+│   |           │   ├── myuser
+│   |           │   │   └── some_package 
+│   |           │   │   └── other_package
+│   |           │   └── sstephenson
+│   |           │       └── bats 
+│   |           │   └── LuRsT
+│   |           │       └── hr
 └── .benv0 
   └── packages <symlink1_target>
       ├── some_package
