@@ -155,9 +155,9 @@ This will create:
 │   |           │   └── LuRsT
 │   |           │       └── hr
 └── .benv0 
-  └── packages <symlink1_target>
-      ├── some_package
-      └── some_other_package
+    └── packages <symlink1_target>
+        ├── some_package
+        └── some_other_package
 ```
 
 Currently, to reenter the bENV sub-environment, do:
