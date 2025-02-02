@@ -1,40 +1,9 @@
+# bENV - Basher ENVironments
 ![](logo.jpg)
 
-# bENV - Basher ENVironments
 [![basher install](https://www.basher.it/assets/logo/basher_install.svg)](https://www.basher.it/package/)
 
-bENV is like python's virtual environments but for Bash scripts. 
-It is a wrapper around [Basher](https://github.com/basherpm/basher), a successful package manager for shell scripts.
-
-It was built out of desire to make something similar to [Desk](https://github.com/jamesob/desk) but simpler and more natural in usage. 
-Desk is a nice tool but it felt it reinvents the wheel and doesn't take full advantage of what Basher already offers.
-I needed something that supports/extends how Basher works internally and builds on top of it and still use it's functionality transparently.
-
-And so bENV was born.
-
-# Motivation
-
-Like most, you're probably busy working on multiple projects or tasks. Each requiring a different set of shell scripts.
-
-If you were to only use Basher, all packages and their environment(functions, variables, completions) would have to be loaded. Even if your current task only requires a small subset of them.
-
-With bENV and Basher, you can now easily create and manage multiple environments. 
-
-# Features
-
-- multiple bENV environments. Each with its own set of packages.
-Effortlessly activate/switch between them depending on the task you're working on.
-This allows you to focus on what you're working on and load only the packages and functions you need. 
-
-- transparent Basher usage.
-All Basher commands are internally wrapped to also do the magic of bENV. Please see "Transparent Basher usage".
-
-- share packages between multiple bENV environments 
-By symlinking them to a central location, common to all of them. This makes it easier to update your packages across all environments.
-Still, you can easily opt-out and have packages installed locally to that environment. Please look at "Flexible. Everything is customizable" section below on how to achieve this.
-
-- group environments in a hierarchy
-This allows you to create sub-environments and still share packages between them. Please see "Enter, Sub-environments".
+bENV is like Python virtual environments but for Bash scripts. It wraps [Basher](https://github.com/basherpm/basher), a popular package manager for shell scripts. Inspired by [Desk](https://github.com/jamesob/desk), it simplifies and extends Basher without reinventing the wheel.
 
 # Installation
 
@@ -50,69 +19,94 @@ Parameters:
 
 # Example
 
-`benv my_env --ssh mygit.local/myuser/somepackage:LuRsT/hr:--ssh mygit.local/myuser/otherpackage:sstephenson/bats`
-
-This does 2 things:
-- creates the my_env folder 
-under .basher/cellar/benv
-
-- activates the bENV environment `my_env` 
-by starting a Bash subshell. And enables Basher to work only with packages installed in this environment. 
-
-To exit this bENV environment, just exit the subshell with `exit` or Ctrl-D.
-A nice thing, if you've activated multiple environments, one inside another, exiting the last will follow the breadcrumb and activate the parent. And so on.
-
-# Efficient package management
-
-Any bENV activation will first create ensure a bENV packages folder exist under:
-
-.basher/cellar/benv/.benv0/packages
-
-Thereafter, all bENV enviroments under .basher/cellar/benv/ will symlink their packages to this folder.
-
-## How does this help?
-
-Well, it works similarly with pnpm versus npm. Take a look at this comment:
-
-https://www.reddit.com/r/node/comments/144xqd8/comment/jni5lex/
->>>  pnpm all the way for me.
-The speed is a huge bonus.
-The other thing that's a big plus for me is that I don't end up with gigabytes of node_modules strewn around my disk from various different projects. pnpm installs everything into one central place (which is easy to configure your backup to ignore) and then creates symlinks to it. 
-
-When the number of common Basher packages grows and they're used between multiple bENV enviromnents, this is a nice win.
-
-But the biggest win is that only the functions and enviroment variables needed for what you're working on currently are loaded. 
-If you were to only use Basher, all packages and their environment(functions + variables) would be loaded. Even if at your current task you'd not need most of them.
-
-# Transparent Basher usage
-
-Basher's commands are internally wrapped. 
-For example, `basher install <some_package>` will also do the magic of bENV. 
-
-It automatically symlinks this package inside the central package repo shared by all bENV environments, the packages under BENV0_ROOT.
-If it already exists there, it will not be cloned again but instead reused.
-
-# Flexible. Customizable
-
-Take this for example. BENV_ROOT path is configurable. Just like you could customize BASHER's environment variables.
+To create and activate an environment `my_env` with specified packages:
 
 ```bash
-export BENV_ROOT="$HOME/.basher/cellar/pkg_envs"
-export BENV0_ROOT="$BENV_ROOT/root_env"
-# and yet, both paths don't have to be under basher at all if you want
-# export BENV_ROOT="some/other/path"
-# export BENV0_ROOT="and/another/path"
 benv my_env --ssh mygit.local/myuser/somepackage:LuRsT/hr:--ssh mygit.local/myuser/otherpackage:sstephenson/bats
 ```
 
-Put this in a script and you can use this pattern to all your created environments.
+This will:
+
+1. Create the `my_env` folder under `.basher/cellar/benv`.
+2. Activate `my_env` environment: install all packages specified and launch a Bash subshell. By default, Basher will only use packages installed in that environment.
+
+To exit the bENV environment, simply run `exit` or press `Ctrl-D`. If you’ve activated multiple environments nested within each other, exiting the last will return you to the parent environment and so on.
+
+# Motivation
+
+Like many, you're likely juggling multiple projects, each requiring a different set of shell scripts.  
+If you used Basher alone, all packages and their environments (functions, variables, completions) would be loaded, even if you only needed a small subset for your task.
+
+bENV allows you to create and manage multiple environments, each tailored to a specific set of scripts, while only loading what’s necessary for the task at hand.
+
+# Features
+
+- **Multiple bENV environments**  
+  Effortlessly activate and switch between environments, each with its own set of packages. This allows you to focus on the task at hand without loading unnecessary scripts.
+
+- **Transparent Basher usage**  
+  Basher commands are wrapped by bENV, making package management seamless. Refer to the section "Transparent Basher usage" for details.
+
+- **Package sharing between environments**  
+  Packages can be shared between sibling environments by symlinking to a central location. This makes it easier to update packages across all environments. You can also opt to install packages locally within a specific environment. See "Flexible. Customizable" for more.
+
+- **Hierarchical environment grouping**  
+  bENV supports nested sub-environments, enabling you to organize environments in a parent-child structure while maintaining shared packages between sibling environments. Check "Enter Sub-environments" for more details.
+
+# Efficient package management
+
+```
+.basher/cellar/benv/.benv0/packages
+```
+
+By default, all bENV environments will symlink their packages to this folder, allowing shared access across sibling environments.
+
+Similar to `pnpm`'s approach over `npm`, this reduces redundant package installations and disk space usage by creating symlinks instead of duplicating packages across environments. 
+
+Additionally, activating a bENV environment only loads the functions and environment variables needed for the current task, improving efficiency and reducing unnecessary overhead compared to using Basher alone.
+
+# Transparent Basher usage
+
+bENV wraps Basher’s commands to provide transparent package management. For instance, when you run:
+
+```bash
+basher install <some_package>
+```
+
+bENV will automatically symlink the package to the central package repository shared across all bENV environments, located under `BENV0_ROOT`. If the package already exists, it will not be cloned again, but reused.
+
+# Flexible. Customizable
+
+Take this for example. BENV_ROOT path is configurable. Just like you could customize BASHER's environment variables, you can do the same for bENV.
+
+```bash
+# create a script in one of your Basher packages, let's call it my_user/benv2
+# .basher/cellar/packages/my_user/benv2/benv2.sh
+export BENV_ROOT="$HOME/.basher/cellar/pkg_envs"
+export BENV0_ROOT="$BENV_ROOT/root_env"
+
+# both paths don't even have to be under basher at all. So if you want you can also do:
+# export BENV_ROOT="some/other/path"
+# export BENV0_ROOT="and/another/path"
+benv $@
+```
+
+Next use benv2.sh everywhere you want to use bENV and this pattern will apply to all your created environments.
 
 ## Enter, Sub-environments
 
-One caveat of this is that you can create nested sub-environments with this approach.
-By default, all bENV environments created go in the same BENV_ROOT folder thus creating a linear horizontal structure.
+Now try changing benv2.sh to:
 
-But what if you wanted a hierarchical structure instead?
+```bash
+# .basher/cellar/packages/my_user/benv2/benv2.sh
+export BENV_ROOT="$BASHER_PREFIX/benvs"
+export BENV0_ROOT="$BENV_ROOT/.benv0"
+benv $@
+```
+
+Fun fact, since activating a bENV environment internally resets the BASHER_PREFIX var to that env's path, by using the above you can achieve sub-environments. That is because while parent bENV is active, BASHER_PREFIX would point to it's path.
+Each new bENV will be created under the parent bENV's path.
+
 Like:
 
 ```txt
@@ -123,23 +117,14 @@ Like:
 └── my_other_env
 ```
 
-This can be easily achieved by using the base pattern offered by bENV.
-Just set the BENV_ROOT0 folder to be related to BASHER_PREFIX folder which always points to the current bENV environment path.
-Like:
+Then in a new terminal, run:
 
 ```bash
-# create a script in one of your Basher packages, let's call it benv2
-# .basher/cellar/packages/my_user/benv2/benv2.sh
-export BENV_ROOT="$BASHER_PREFIX/benvs"
-export BENV0_ROOT="$BENV_ROOT/.benv0"
-benv $@
-
-# then in a new terminal, run:
-benv2 my_env
+benv2.sh my_env
 basher install <some_package>:<some_other_package>
 
-# and while still in my_env, do this:
-benv2 my_sub_env --ssh mygit.local/myuser/somepackage:LuRsT/hr:--ssh mygit.local/myuser/otherpackage:sstephenson/bats
+# and while still in my_env, activate a sub-environment and install some packages in it:
+benv2.sh my_sub_env --ssh mygit.local/myuser/some_package:LuRsT/hr:--ssh mygit.local/myuser/some_other_package:sstephenson/bats
 ```
 
 This will create:
@@ -156,6 +141,10 @@ This will create:
 │   │           ├── myuser 
 │   │           │   ├── some_package <symlink2>
 │   │           │   └── some_other_package <symlink2>
+│   │           └── sstephenson
+│   │               └── bats <symlink2>
+│   │           └── LuRsT
+│   │               └── hr <symlink2>
 │   │   └── .benv0
 │   |       ├── packages <symlink2_target>
 │   |       │   ├── myuser
@@ -174,12 +163,12 @@ This will create:
 Currently, to reenter the bENV sub-environment, do:
 
 ```bash
-benv2 my_env
+benv2.sh my_env
 #followed by
-benv2 my_sub_env
+benv2.sh my_sub_env
 ```
 
-Note: While working with bENV enviroments structured like this(hierarchically), it is important to always keep using benv2 instead of benv. 
+Note: While working with bENV enviroments structured like this(hierarchically), it is important to always keep using benv2.sh instead of benv. 
 This ensures the sub-environments will correctly reference the packages at correct locations.
 
 TODO: add support for benv my_env/my_sub_env
